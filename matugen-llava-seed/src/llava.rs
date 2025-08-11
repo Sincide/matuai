@@ -7,25 +7,61 @@ use image::imageops::FilterType;
 use image::GenericImageView;
 use reqwest::blocking::Client;
 use serde::Deserialize;
+use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::path::Path;
 use std::time::Duration;
 
-const PROMPT: &str = r##"System: You are a wallpaper-to-UI theming assistant. Pick exactly one accent color suitable as a UI seed color.
-User: Analyze the attached image. Return ONLY valid JSON in this exact schema:
-{"seed_hex":"#RRGGBB"}
+const PROMPT: &str = r##"System: You are a wallpaper-to-UI theming assistant.
+User: Analyze the attached image and respond ONLY with a JSON object in this exact schema:
+{
+  "primary_hex":"#RRGGBB",
+  "secondary_hex":"#RRGGBB",
+  "tertiary_hex":"#RRGGBB",
+  "accent1_hex":"#RRGGBB",
+  "accent2_hex":"#RRGGBB",
+  "neutral1_hex":"#RRGGBB",
+  "neutral2_hex":"#RRGGBB"
+}
 Rules:
-- seed_hex must be a 7-character hex like "#82A3FF".
-- Choose a color that works as an accent for both text and UI elements.
-- Avoid extremely low-contrast grayish colors and neon extremes.
-- No extra text. Only the JSON object."##;
+- Every value must be a 7-character hex string like "#82A3FF".
+- Colors should be suitable for UI theming with good contrast.
+- Avoid neon extremes and near-grayscale tones.
+- Return only the JSON object, no extra text."##;
+
+pub type Palette = BTreeMap<String, String>;
 
 #[derive(Deserialize)]
 struct LlavaResp {
     response: String,
 }
 
-pub fn analyze_image(cfg: &Config, path: &Path) -> Result<String> {
+/// Attempt to parse a palette JSON string into a map of color values.
+/// Only keys that contain valid 7-character hex colors are included.
+pub fn parse_palette(text: &str) -> Option<Palette> {
+    let parsed: serde_json::Value = serde_json::from_str(text).ok()?;
+    let obj = parsed.as_object()?;
+    let keys = [
+        "primary_hex",
+        "secondary_hex",
+        "tertiary_hex",
+        "accent1_hex",
+        "accent2_hex",
+        "neutral1_hex",
+        "neutral2_hex",
+    ];
+    let mut out = BTreeMap::new();
+    for key in keys.iter() {
+        if let Some(val) = obj.get(*key).and_then(|v| v.as_str()) {
+            if validate_hex(val) {
+                out.insert((*key).to_string(), val.to_string());
+            }
+        }
+    }
+    if out.is_empty() { None } else { Some(out) }
+}
+
+pub fn analyze_image(cfg: &Config, path: &Path) -> Result<Palette> {
     let img = image::open(path)?;
     let img = downscale(img);
     let mut cursor = Cursor::new(Vec::new());
@@ -54,25 +90,15 @@ pub fn analyze_image(cfg: &Config, path: &Path) -> Result<String> {
             Err(e) => return Err(anyhow!("llava request failed: {e}")),
         };
         let text = resp.text()?;
-        // attempt to parse seed directly
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
-            if let Some(seed) = v.get("seed_hex").and_then(|v| v.as_str()) {
-                if validate_hex(seed) {
-                    return Ok(seed.to_string());
-                }
-            }
+
+        if let Some(palette) = parse_palette(&text) {
+            return Ok(palette);
         }
+
         let parsed: Result<LlavaResp, _> = serde_json::from_str(&text);
         if let Ok(parsed) = parsed {
-            if validate_hex(&parsed.response) {
-                return Ok(parsed.response);
-            }
-            if let Ok(j) = serde_json::from_str::<serde_json::Value>(&parsed.response) {
-                if let Some(seed) = j.get("seed_hex").and_then(|v| v.as_str()) {
-                    if validate_hex(seed) {
-                        return Ok(seed.to_string());
-                    }
-                }
+            if let Some(palette) = parse_palette(&parsed.response) {
+                return Ok(palette);
             }
         }
         if attempt == 0 {

@@ -3,11 +3,14 @@ use anyhow::{anyhow, Result};
 use std::path::Path;
 use std::process::Command;
 
-pub fn run_from_color(cfg: &Config, seed: &str, mode: &str, dry_run: bool) -> Result<()> {
-    let mut args = cfg.matugen.args_color.clone();
-    args.push(seed.to_string());
-    args.extend(cfg.matugen.extra_args.clone());
-    run_matugen(args, mode, dry_run)
+pub fn run_from_colors(cfg: &Config, seeds: &[String], mode: &str, dry_run: bool) -> Result<()> {
+    for seed in seeds {
+        let mut args = cfg.matugen.args_color.clone();
+        args.push(seed.to_string());
+        args.extend(cfg.matugen.extra_args.clone());
+        run_matugen(args, mode, dry_run)?;
+    }
+    Ok(())
 }
 
 pub fn run_from_image(cfg: &Config, image: &Path, mode: &str, dry_run: bool) -> Result<()> {
