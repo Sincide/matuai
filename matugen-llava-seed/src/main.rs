@@ -39,8 +39,8 @@ fn main() -> Result<()> {
 
 fn analyze_cmd(image: PathBuf, _mode: Option<String>) -> Result<()> {
     let cfg = Config::load()?;
-    let seed = llava::analyze_image(&cfg, &image)?;
-    println!("{}", seed);
+    let palette = llava::analyze_image(&cfg, &image)?;
+    println!("{}", serde_json::to_string_pretty(&palette)?);
     Ok(())
 }
 
@@ -50,8 +50,14 @@ fn apply_cmd(image: PathBuf, mode: Option<String>, force: bool, dry: bool) -> Re
         let desired_mode = mode.unwrap_or_else(|| cfg.behavior.mode_default.clone());
         let lum = utils::average_luminance(&image)?;
         let actual_mode = if desired_mode == "auto" { utils::decide_mode(lum).to_string() } else { desired_mode };
-        let seed = llava::analyze_image(&cfg, &image).unwrap_or_default();
-        println!("dry-run: seed={} mode={} matugen from color?{}", seed, actual_mode, utils::validate_hex(&seed));
+        let palette = llava::analyze_image(&cfg, &image).unwrap_or_default();
+        let valid = !palette.is_empty() && palette.values().all(|c| utils::validate_hex(c));
+        println!(
+            "dry-run: palette={:?} mode={} matugen from colors?{}",
+            palette,
+            actual_mode,
+            valid
+        );
         println!("Matugen extra args {:?}", cfg.matugen.extra_args);
         reload::run_hooks(&cfg, true);
         return Ok(());

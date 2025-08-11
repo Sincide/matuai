@@ -7,6 +7,7 @@ pub mod watch;
 
 use anyhow::Result;
 use std::path::PathBuf;
+use crate::llava::Palette;
 
 pub fn apply_once(image: PathBuf, mode: Option<String>, force: bool) -> Result<()> {
     let cfg = config::Config::load()?;
@@ -27,18 +28,25 @@ pub fn apply_once(image: PathBuf, mode: Option<String>, force: bool) -> Result<(
         serde_json::Map::new()
     };
     let hash = utils::hash_file(&image)?;
-    let mut seed = if !force { cache.get(&hash).and_then(|v| v.as_str()).map(|s| s.to_string()) } else { None };
-    if seed.is_none() {
-        seed = llava::analyze_image(&cfg, &image).ok();
-        if let Some(s) = &seed {
-            cache.insert(hash.clone(), serde_json::Value::String(s.clone()));
+    let mut palette: Option<Palette> = if !force {
+        cache
+            .get(&hash)
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+    } else {
+        None
+    };
+    if palette.is_none() {
+        palette = llava::analyze_image(&cfg, &image).ok();
+        if let Some(p) = &palette {
+            cache.insert(hash.clone(), serde_json::to_value(p)?);
             std::fs::write(&cache_path, serde_json::to_string_pretty(&cache)?)?;
         }
     }
-    let seed = seed.unwrap_or_default();
+    let palette = palette.unwrap_or_default();
 
-    if utils::validate_hex(&seed) {
-        matugen::run_from_color(&cfg, &seed, &actual_mode, false)?;
+    if !palette.is_empty() {
+        let colors: Vec<String> = palette.values().cloned().collect();
+        matugen::run_from_colors(&cfg, &colors, &actual_mode, false)?;
     } else {
         matugen::run_from_image(&cfg, &image, &actual_mode, false)?;
     }
