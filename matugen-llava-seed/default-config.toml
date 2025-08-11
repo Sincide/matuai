@@ -1,0 +1,23 @@
+[llava]
+endpoint = "http://127.0.0.1:11434"
+model = "llava:latest"
+temperature = 0.1
+timeout_ms = 3500
+
+[matugen]
+args_color = ["color"]
+args_image = ["image"]
+extra_args = []
+
+[behavior]
+mode_default = "auto"
+vibrancy_clamp = 0.85
+cache_dir = "~/.cache/matugen-llava-seed"
+log_level = "info"
+
+[reload]
+enable_hyprland = true
+enable_waybar = true
+enable_mako = true
+enable_kitty = true
+enable_fish = true

@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch wallpapers for changes
+
+[Path]
+PathModified=%h/Pictures/wallpapers
+Unit=matugen-llava-seed.service
+
+[Install]
+WantedBy=default.target
