@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily matugen-llava-seed refresh
+
+[Timer]
+OnCalendar=*-*-* 08:00:00
+Persistent=true
+Unit=matugen-llava-seed.service
+
+[Install]
+WantedBy=timers.target

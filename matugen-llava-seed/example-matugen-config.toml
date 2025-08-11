@@ -1,0 +1,3 @@
+[templates]
+kitty = { input = "kitty.mustache", output = "~/.config/kitty/theme.conf" }
+waybar = { input = "waybar.mustache", output = "~/.config/waybar/colors.css" }
