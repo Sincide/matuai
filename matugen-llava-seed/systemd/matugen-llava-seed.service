@@ -1,0 +1,6 @@
+[Unit]
+Description=matugen-llava-seed apply
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/matugen-llava-seed apply --image %f
